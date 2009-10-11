@@ -10,16 +10,55 @@ module CouchPotato
         define_accessors accessors_module_for(owner_clazz), name, options
       end
       
+      # def build(object, json)
+      #   value = json[name.to_s] || json[name.to_sym]
+      #   typecast_value =  if type
+      #                         type.json_create value
+      #                       else
+      #                         value
+      #                       end
+      #   object.send "#{name}=", typecast_value
+      # end
+      
       def build(object, json)
         value = json[name.to_s] || json[name.to_sym]
         typecast_value =  if type
-                              type.json_create value
-                            else
-                              value
-                            end
+                            type.json_create value
+                          else
+                            build_value(value)
+                          end
         object.send "#{name}=", typecast_value
       end
       
+      def build_value(value)
+        if value.is_a?(Hash)
+          build_hash(value)
+        elsif value.is_a?(Array)
+          build_array(value)
+        else
+          value
+        end
+      end
+      
+      def build_array(array)
+        array.collect do |value|
+          build_value(value)
+        end
+      end
+    
+      def build_hash(hash)
+        hash.symbolize_keys!
+        if hash[:ruby_class]
+          klass = eval(hash.delete(:ruby_class))
+          klass.new(hash)
+        else
+          hash.each_pair do |key, value|
+            hash[key] = build_value(value)
+          end
+          hash
+        end
+      end
+
       def dirty?(object)
         object.send("#{name}_changed?")
       end
